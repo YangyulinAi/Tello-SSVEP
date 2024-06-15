@@ -141,7 +141,7 @@ class MainApplication:
                     elif prediction[0, 0] < prediction[0, 1] and prediction[0, 1] > 0.99:
                         command = 1
                     else:
-                        command = 1 # -1
+                        command = -1
                     if not self.is_start:
                         command = -2
                     print("Prediction Result:", predictor.predict(data))
