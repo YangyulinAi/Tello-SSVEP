@@ -18,7 +18,7 @@ import threading
 
 class TelloController:
 
-    def __init__(self, debug=False):
+    def __init__(self, debug=True):
         if not debug:
             self.setup()
 
@@ -36,11 +36,8 @@ class TelloController:
         battery = self.tello.get_battery()
         logging.info(f"Battery level: {battery}%")
         return battery
-
-
-
     def takeoff(self):
-        if self.check_battery() > 5 and not self.is_flying:  # Execute take-off only when the drone is not in the air
+        if not self.is_flying:  # Execute take-off only when the drone is not in the air
             if self.check_battery() < 15:
                 logging.info("Battery will ran out, please land soon")
             self.tello.takeoff()
@@ -114,6 +111,9 @@ class TelloController:
     def rotate(self, degree):
         self.tello.rotate_clockwise(degree)
 
+    def rotate_desc(self, degree):
+        self.tello.rotate_counter_clockwise(degree)
+
     def flip_left(self):
         self.tello.flip('l')
 
@@ -131,9 +131,7 @@ class TelloController:
             self.tello.land()
             self.is_flying = False
             logging.info("Drone has landed")
-            time.sleep(self.stabilization_time)  # Stabilising drones
-            self.tello.end()
-            logging.info("Disconnected from Tello drone")
+
 
     def emergency_land(self):
         self.tello.land()
@@ -144,6 +142,8 @@ class TelloController:
 
     def emergency(self):
         self.tello.emergency()
+        self.tello.end()
+        logging.info("Disconnected from Tello drone")
 
     def check_flying_status(self):
         return self.is_flying

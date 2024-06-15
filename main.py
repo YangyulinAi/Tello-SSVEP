@@ -28,6 +28,7 @@ finally:
 import subprocess
 import sys
 
+
 def install_and_import(package):
     try:
         __import__(package)
@@ -36,111 +37,141 @@ def install_and_import(package):
         subprocess.check_call([sys.executable, "-m", "pip", "install", package])
         __import__(package)
 
-required_packages = ['pylsl','djitellopy','winsound','pygame','tensorflow']
+
+required_packages = ['pylsl', 'djitellopy', 'winsound', 'pygame', 'tensorflow']
 for package in required_packages:
     install_and_import(package)
 
 from eeg_app import EEGApp
-from SSVEP_handler import SSVEPHandler
+from ssvep_handler import SSVEPHandler
 from tello_controller import TelloController
 import tkinter as tk
 import threading
 from predictor import Predictor
-import numpy as np
+
 
 class MainApplication:
     def __init__(self):
         self.root = tk.Tk()
-        self.app = EEGApp(self.root, self.handle_data, self.mode_change)
-        self.controller = TelloController(debug=True)
-
-        self.channel = 0
+        self.app = EEGApp(self.root, self.handle_data, self.reset)
+        self.root.bind('<space>', lambda _: self.start(self))
+        self.debug = False
+        self.safe_mode = False
         self.lower = 5
         self.upper = 50
 
-        self.mode = 1
+        self.controller = TelloController()
+        self.stage = 0
+        self.distance = 0
+        self.is_start = False
 
-        self.root.bind('<space>', self.toggle_fly)
-        self.root.bind('<Up>', lambda _: self.controller.move_forward(20))
-        self.root.bind('<Down>', lambda _: self.controller.move_back(20))
-        self.root.bind('<Left>', lambda _: self.controller.move_left(20))
-        self.root.bind('<Right>', lambda _: self.controller.move_right(20))
-        self.root.bind('<f>', lambda _: self.controller.flip_left())
-        self.root.bind('<w>', lambda _: self.controller.flip_forward())
-        self.root.bind('<s>', lambda _: self.controller.flip_backward())
-        self.root.bind('<a>', lambda _: self.controller.flip_left())
-        self.root.bind('<d>', lambda _: self.controller.flip_right())
-        self.root.bind('<q>', lambda _: self.controller.move_up())
-        self.root.bind('<e>', lambda _: self.controller.move_down())
-    def toggle_fly(self,event):
-        print("Safe mode control ...")
-        if self.controller.check_flying_status():
-            self.controller.land()
-        else:
-            self.controller.takeoff()
 
-    def mode_change(self, mode_index):
-        print("mode", mode_index)
-        self.mode = mode_index
-    def handle_data(self, channel, lower, upper):
-        self.channel = channel
+    def setup_safety_mode(self):
+        self.root.bind('<m>', lambda _: self.switch_safe_mode(self))
+
+        self.root.bind('<w>', lambda _: self.controller.takeoff() if self.safe_mode else print("Take off ..."))
+        self.root.bind('<s>', lambda _: self.controller.land() if self.safe_mode else print("Land ..."))
+        self.root.bind('<a>', lambda _: self.controller.rotate_desc(90) if self.safe_mode else print("Rotate -90 ..."))
+        self.root.bind('<d>', lambda _: self.controller.rotate(90) if self.safe_mode else print("Rotate 90 ..."))
+
+        self.root.bind('<Up>', lambda _: self.controller.move_forward(20) if self.safe_mode else print("Forward 20 .."))
+        self.root.bind('<Down>', lambda _: self.controller.move_back(20) if self.safe_mode else print("Back 20 ..."))
+        self.root.bind('<Left>', lambda _: self.controller.move_left(20) if self.safe_mode else print("Left 20 ..."))
+        self.root.bind('<Right>', lambda _: self.controller.move_right(20) if self.safe_mode else print("Right 20 ..."))
+
+        self.root.bind('<f>', lambda _: self.controller.flip_left() if self.safe_mode else print("Flip ..."))
+        self.root.bind('<q>', lambda _: self.controller.move_up() if self.safe_mode else print("Move up ..."))
+        self.root.bind('<e>', lambda _: self.controller.move_down() if self.safe_mode else print("Move Down ..."))
+
+    def start(self, event):
+        if not self.is_start:
+            print("Timer Start!")
+            self.is_start = True
+            self.app.toggle_timer()
+
+    def end(self):
+        if self.is_start:
+            print("Timer End!")
+            self.is_start = False
+            self.app.toggle_timer()
+    def switch_safe_mode(self, event):
+        self.safe_mode = not self.safe_mode
+        print("Sate Mode:", self.safe_mode)
+
+    def reset(self, mode_index):
+        print("Reset")
+        self.stage = 0
+        self.distance = 0
+        self.app.reset_timer()
+        self.end()
+
+    def handle_data(self, debug, lower, upper):
+        self.debug = debug
         self.lower = lower
         self.upper = upper
         print("Received data:")
-        print("Channel:", self.channel)
+        print("Debug Mode:", self.debug)
         print("Lower Cutoff Hz:", self.lower)
         print("Upper Cutoff Hz:", self.upper)
 
+        if not self.debug:
+            self.setup_safety_mode()
+
         threading.Thread(target=self.processing_data).start()
         threading.Thread(target=self.processing_ssvep).start()
-
+        self.controller = TelloController(debug=self.debug)
 
     def processing_ssvep(self):
         from ssvep_stimulus import SSVEPStimulus
-        ssvep = SSVEPStimulus()
-
+        new_window = tk.Toplevel(self.root)
+        new_window.title("SSVEP Settings")
+        SSVEPStimulus(new_window)
+        self.root.focus_set()
     def processing_data(self):
         # Real-time EEG Stream
-        processor = SSVEPHandler(self.channel, self.lower, self.upper)
-        model_path = './allen_lstm_binary_1.keras'
-        predictor = Predictor(model_path)
-        is_fly = False
+        processor = SSVEPHandler(self.lower, self.upper)
+        predictor = Predictor()
         try:
-
             if processor.safe_mode == "off":
                 for data in processor.process_data():
-                    print("HERE IS DATA", data.shape)
-                    command = np.argmax(predictor.predict(data), axis=-1)
+                    # command = np.argmax(predictor.predict(data), axis=-1)
+                    prediction = predictor.predict(data)
+                    if prediction[0, 0] > prediction[0, 1] and prediction[0, 0] > 0.99:
+                        command = 0
+                    elif prediction[0, 0] < prediction[0, 1] and prediction[0, 1] > 0.99:
+                        command = 1
+                    else:
+                        command = 1 # -1
+                    if not self.is_start:
+                        command = -2
                     print("Prediction Result:", predictor.predict(data))
                     print("Command:", command)
                     if command is not None:
                         # Processing prediction results
                         if processor.safe_mode == "on":
                             command = -1  # enable safe mode
-                        #print(command)
                         if command == 1:
-                            if not is_fly:
+                            if self.stage == 0:
                                 print("takeoff")
-                                is_fly = True
-                                #self.controller.takeoff()
-                            else:
-                                print("land")
-                                is_fly = False # For safety purpose can comment this line
-                                #self.controller.land()
-                        elif command == 2:
-                            if is_fly:
-                                print("fly task performed")
-                                if self.mode == 1:
-                                    #self.controller.preset_command()
-                                    print("1")
-                                elif self.mode == 2:
-                                    #self.controller.preset_command_2()
-                                    print("2")
+                                if not self.debug:
+                                    self.controller.takeoff()
+                                self.stage = 1
+                            elif self.stage == 1:
+                                if self.distance < 160:
+                                    if not self.debug:
+                                        self.controller.move_forward(20)
+                                    self.distance += 20
+                                    print("move 20 cm")
                                 else:
-                                    #self.controller.move_forward(20)
-                                    print("3")
+                                    self.stage = 2
+                            elif self.stage == 2:
+                                print("land")
+                                if not self.debug:
+                                    self.controller.land()
+                                self.stage = 3
+                                self.end()
             else:
-                print("debugdebug")
+                print("safe mode on")
         except Exception as e:
             print(e)
             # self.controller.emergency()

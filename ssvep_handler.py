@@ -5,9 +5,8 @@ import matplotlib.pyplot as plt
 
 
 class SSVEPHandler:
-    def __init__(self, channel=0, lower=5, upper=50, fs=120, notch_freq=50, quality_factor=30):
+    def __init__(self, lower=5, upper=50, fs=120, notch_freq=50, quality_factor=30):
         self.fs = fs  # Sampling rate
-        self.channel = channel  # Channel
         self.lower = lower  # Lower frequency for bandpass filter
         self.upper = upper  # Upper frequency for bandpass filter
         self.notch_freq = notch_freq  # Notch filter frequency
@@ -46,14 +45,15 @@ class SSVEPHandler:
                 chunk, timestamps = self.inlet.pull_chunk(max_samples=self.fs, timeout=1.0)
                 if timestamps:  # If there is data coming in
                     data = np.array(chunk)
-                    #data_filtered = lfilter(self.b_notch, self.a_notch, data.T)
-                    #data_bandpassed = self.bandpass_filter(data_filtered)
-                    processed_data = data[:,:7]
+                    data_filtered = lfilter(self.b_notch, self.a_notch, data)
+                    data_bandpassed = self.bandpass_filter(data_filtered)
 
-                    print("debug",processed_data.shape)
+                    data_bandpassed = data_bandpassed[:,:7]
 
 
-                    yield processed_data
+
+
+                    yield data_bandpassed
                     is_data_coming = True
                 else:
                     if is_data_coming:

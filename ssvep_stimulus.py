@@ -18,6 +18,7 @@ class SSVEPStimulus:
         print("LSL Stream is active.")
         self.setup_widgets()
 
+
     def setup_widgets(self):
         # Set the number of stimuli
         tk.Label(self.master, text="Enter Number of Stimuli (1-4):").pack()
@@ -100,20 +101,21 @@ class SSVEPStimulus:
                 current_index = (current_index + 1) % num_stimuli  # Cycle through each frequency
                 change_time = current_time
                 current_freq = frequencies[current_index]
-                self.outlet.push_sample([f"Freq_{current_freq}Hz"])  # Send event marker
-                print(f"Freq_{current_freq}Hz")
                 if num_stimuli == 1:
                     if close_eyes:
-                        self.outlet.push_sample([f"close_eyes"])  # Send event marker
-                        print(f"close_eyes")
+                        self.outlet.push_sample([f"not_look"])  # Send event marker
+                        print(f"Not look")
                         close_eyes = False
-                        winsound.Beep(500, 100)
+                        winsound.Beep(1000, 100)
 
                     else:
-                        self.outlet.push_sample([f"open_eyes"])  # Send event marker
-                        print(f"open_eyes")
+                        self.outlet.push_sample([f"look"])  # Send event marker
+                        print(f"Look")
                         close_eyes = True
                         winsound.Beep(1000, 100)
+                else:
+                    self.outlet.push_sample([f"Freq_{current_freq}Hz"])  # Send event marker
+                    print(f"Freq_{current_freq}Hz")
 
             screen.fill(black)  # Clear the screen to black
 
@@ -133,8 +135,4 @@ class SSVEPStimulus:
 
         pygame.quit()
 
-# Create a Tkinter window
-root = tk.Tk()
-root.title("SSVEP Settings")
-app = SSVEPStimulus(root)
-root.mainloop()
+
