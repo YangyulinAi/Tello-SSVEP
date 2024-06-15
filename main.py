@@ -24,6 +24,22 @@ finally:
     controller.land()
 
 """
+
+import subprocess
+import sys
+
+def install_and_import(package):
+    try:
+        __import__(package)
+    except ImportError:
+        print(f"{package} not found. Installing...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+        __import__(package)
+
+required_packages = ['pylsl','djitellopy','winsound','pygame','tensorflow']
+for package in required_packages:
+    install_and_import(package)
+
 from eeg_app import EEGApp
 from SSVEP_handler import SSVEPHandler
 from tello_controller import TelloController
