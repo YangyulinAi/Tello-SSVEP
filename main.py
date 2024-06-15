@@ -92,6 +92,12 @@ class MainApplication:
         print("Upper Cutoff Hz:", self.upper)
 
         threading.Thread(target=self.processing_data).start()
+        threading.Thread(target=self.processing_ssvep).start()
+
+
+    def processing_ssvep(self):
+        from ssvep_stimulus import SSVEPStimulus
+        ssvep = SSVEPStimulus()
 
     def processing_data(self):
         # Real-time EEG Stream
