@@ -103,13 +103,13 @@ class SSVEPStimulus:
                 current_freq = frequencies[current_index]
                 if num_stimuli == 1:
                     if close_eyes:
-                        self.outlet.push_sample([f"not_look"])  # Send event marker
+                        self.outlet.push_sample([f"eyes_closed"])  # Send event marker
                         print(f"Not look")
                         close_eyes = False
                         winsound.Beep(1000, 100)
 
                     else:
-                        self.outlet.push_sample([f"look"])  # Send event marker
+                        self.outlet.push_sample([f"eyes_open"])  # Send event marker
                         print(f"Look")
                         close_eyes = True
                         winsound.Beep(1000, 100)
